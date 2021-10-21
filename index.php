@@ -1,14 +1,13 @@
 <?php 
 /**
- *  Fork by Stefan Knaak
- *  - add Worker Hasrate
- *  - fix btc error
- * 
- * */
-
-
-/**
+*  Fork by Stefan Knaak
+*  - add Worker Hasrate
+*  - add nanopool actuall balance
+*  - add nanopool actuall balance euro
+*  - fix BTC error
+*  - fix Approx mining earnings per Mont
 * 
+*
 * Coin Dashboard by Christian Haschek
 * https://blog.haschek.at
 *
@@ -33,6 +32,11 @@ define('INFLUX_PORT',8072); // The UDP (!) port of your InfluxDB instance
 //  $ethwallets[] = '0x69ea6b31ef305d6b99bb2d4c9d99456fa108b02a';
 //  $ethwallets[] = '0xce6265f9e675b0a6ed99bd146c2758eef5d08727';
 //  $ethwallets[] = '0xc525b4dd2dc308599fc9c76a837a25b6f72d3318';
+
+$ethwallets[] = '0x1337C2F18e54d72d696005d030B8eF168a4C0d95';
+$btcwallets[] = '1ChrisHMgr4DvEVXzAv1vamkviZNLPS7yx';
+
+
 //------------- Code starts here ------------------------//
 
 // Ethereum stuff
@@ -55,16 +59,18 @@ if(is_array($ethwallets) && count($ethwallets) >= 1)
             $worth = ($eth*$ethsellprice);
             $worthsum+=$worth;
 
+            echo "[ETH] $ethwallet: Got: ".$eth." eth\n";
             echo "[ETH] $ethwallet: Got: ".money_format('%n', $worth)." ".CURRENCY."\n";
             sendToDB('ethereumworth,addr='.$ethwallet.' value='.$worth);
             sendToDB('ethereumcoins,addr='.$ethwallet.' value='.$eth);
             $hashratesum += getHashRateNanopool($ethwallet);
 
             #worker Data
-            $workerData = getWorkerHashrates($ethwallet);
-            if(is_array($workerData))
+            $userData = eth_nanopool_General_Info($ethwallet);
+
+            if(is_array($userData["workers"]))
             {
-                foreach($workerData as $wo)
+                foreach($userData["workers"] as $wo)
                 {
                     $wo_hashrate=floatval($wo["hashrate"]);
                     $h1=floatval($wo["h1"]);
@@ -79,9 +85,32 @@ if(is_array($ethwallets) && count($ethwallets) >= 1)
                 }
             }    
 
+            #AVG            
+            if(is_array($userData["avgHashrate"]))
+            {
+                $avg_h1=floatval($userData["avgHashrate"]["h1"]);
+                $avg_h3=floatval($userData["avgHashrate"]["h3"]);
+                $avg_h6=floatval($userData["avgHashrate"]["h6"]);
+                $avg_h12=floatval($userData["avgHashrate"]["h12"]);
+                $avg_h24=floatval($userData["avgHashrate"]["h24"]);   
+                echo "[ETH] avg_hashrate: $avg_h1 MH/s\n";
+                sendToDB('ethereum_avg_hashrate,addr='.$ethwallet.'  h1='.$avg_h1.',h3='.$avg_h3.',h6='.$avg_h6.',h12='.$avg_h12.',h24='.$avg_h24);
+            }     
+
+                $user_balance = $userData["balance"];
+                $unconfirmed_balance = $userData["unconfirmed_balance"];
+                echo "[ETH] Nanopool Balance: $user_balance eth\n";
+                sendToDB('ethereum_balance,addr='.$ethwallet.'  balance='.$user_balance.',unconfirmed_balance='.$unconfirmed_balance);
+
+                $prices = getPrices();
+                $user_balance_currency = ($user_balance * $prices["price_eur"]);
+                echo "[ETH] Nanopool Balance in Money: ".money_format('%n', $user_balance_currency)." ".CURRENCY."\n";
+                sendToDB('ethereum_balance_money,addr='.$ethwallet.'  balance='.$user_balance_currency);
+                
+
         }
 
-    $ethminingearnings=calculateETHMiningEarnings($hashratesum,'bitcoins','month');
+    $ethminingearnings=calculateETHMiningEarnings($avg_h24,'euros','month');
     if(!$ethminingearnings) $ethminingearnings = 0;
 
     echo "[ETH] Hashrate: $hashratesum MH/s\n";
@@ -90,7 +119,7 @@ if(is_array($ethwallets) && count($ethwallets) >= 1)
     if($hashratesum >= 1)
     {
         sendToDB('ethereumapproxearnings value='.$ethminingearnings);
-        echo "[ETH] Approx mining earnings: ".money_format('%n', $ethminingearnings)." ".CURRENCY."\n";
+        echo "[ETH] Approx mining earnings per Month: ".money_format('%n', $ethminingearnings)." ".CURRENCY."\n";
     }
 
     
@@ -130,21 +159,19 @@ function getETHBalance($address)
     return $json['result'];
 }
 
-function getWorkerHashrates($address)
+function eth_nanopool_General_Info($address)
 {
     $json = json_decode(file_get_contents('https://api.nanopool.org/v1/eth/user/'.$address),true);
     #var_dump($json["data"]["workers"]);
-    if (is_array($json["data"]["workers"]))
+    if (is_array($json["data"]))
     {
-        return $json["data"]["workers"];
+        return $json["data"];
     }else
     {
         return false;
     }
         
 }
-
-
 
 
 function bchexdec($hex) {
@@ -168,7 +195,14 @@ function getHashRateNanopool($addr)
     return $json['data'];
 }
 
-function calculateETHMiningEarnings($mhs,$currency='dollars',$timespan='month')
+function getPrices()
+{
+    $json = json_decode(file_get_contents('https://api.nanopool.org/v1/eth/prices'),true);
+    return $json['data'];
+}
+
+
+function calculateETHMiningEarnings($mhs,$currency='euros',$timespan='month')
 {
     $json = json_decode(file_get_contents('https://api.nanopool.org/v1/eth/approximated_earnings/'.$mhs),true);
     return $json['data'][$timespan][$currency];
@@ -185,6 +219,7 @@ function sendToDB($data)
 	$socket = stream_socket_client("udp://".INFLUX_IP.":".INFLUX_PORT."");
 	stream_socket_sendto($socket, $data);
 	stream_socket_shutdown($socket, STREAM_SHUT_RDWR);
+    #var_dump($data);
 }
 
 function satoshi2btc($satoshi)
