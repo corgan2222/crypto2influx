@@ -1,15 +1,23 @@
 # crypto2influx
  Making an awesome dashboard for Nanopool ETH and Bitcoin
- original from 
-  https://blog.haschek.at/2017/making-an-awesome-dashboard-for-your-crypto.html
+ Get Crypto Data from 
+ - Nanopool
+ - api.etherscan.io
+ - api.kraken.com
+ - blockchain.info
 
-new Features:
+
+## new Features:
   - add Worker Hasrate
   - add nanopool actuall balance
   - add nanopool actuall balance euro
   - fix BTC error
   - fix Approx mining earnings per Month
  
+ 
+original Code from 
+https://blog.haschek.at/2017/making-an-awesome-dashboard-for-your-crypto.html
+
 
  # Influx Setup
  
@@ -37,4 +45,6 @@ new Features:
 
  for more installation infos goto https://blog.haschek.at/2017/making-an-awesome-dashboard-for-your-crypto.html 
  
+ running from commandline:
+
  ![grafik](https://user-images.githubusercontent.com/12233951/138332088-0baea99c-f47d-406a-b1f1-884cb76ea2ea.png)
