@@ -6,6 +6,9 @@
  - api.kraken.com
  - blockchain.info
 
+![grafik](https://user-images.githubusercontent.com/12233951/138335053-493eb246-1f91-4ec8-99ce-4b3ed1c9936a.png)
+
+
 
 ## new Features:
   - add Worker Hasrate
